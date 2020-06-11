@@ -1,0 +1,50 @@
+#!/usr/local/bin/lr
+library(tidyverse)
+
+args <- keep(argv, ~ !grepl('=', .x))
+kwargs <- keep(argv, ~ grepl('=', .x))
+
+read_file <- function(fname) read_csv(fname) %>% mutate(.fname=fname)
+
+if (length(args) > 0){
+  df <- bind_rows(map(args, read_file))
+} else {
+  df <- read_csv(file("stdin"))
+}
+
+outfile <- sprintf("%s.svg", tempfile())
+
+split <- str_split_fixed(kwargs, "=", 2)
+keys <- split[, 1]
+vals <- split[, 2]
+
+specials <- c("geom", "scale")
+
+geoms <- vals[keys == "geom"]
+scales <- vals[keys == "scale"]
+aes_keys <-  keys[!(keys %in% specials)]
+aes_values <- vals[!(keys %in% specials)]
+aes_list <- as.list(aes_values) %>% setNames(aes_keys)
+aess <- do.call(aes_string, aes_list)
+
+geom_map <- list(line=geom_line,
+                 abline=geom_abline,
+                 point=geom_point,
+                 ribbon=geom_ribbon,
+                 errorbar=geom_errorbar,
+                 ecdf=stat_ecdf)
+scales_map <- list(x_log10=scale_x_log10,
+                   y_log10=scale_y_log10)
+
+apply_element <- function(map, gg, key) gg + map[[key]]()
+
+base_plot <- ggplot(df, aess) +
+  theme_minimal() +
+  theme(legend.position="bottom")
+
+plt <- base_plot %>%
+  reduce(geoms, partial(apply_element, geom_map), .init=.) %>%
+  reduce(scales, partial(apply_element, scales_map), .init=.)
+cat(sprintf("Saving plot to %s", outfile))
+ggsave(file=outfile, plot=plt, width=10, height=8, device="svg")
+browseURL(outfile)

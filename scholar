@@ -1,0 +1,68 @@
+#!/usr/bin/env ipython
+import requests
+import subprocess
+
+import bibtexparser as btp
+import click
+import funcy
+import scholarly as gs
+
+
+DEFAULT_PDF_DIR = "~/Dropbox (MIT)/papers"
+
+
+def write_to_clipboard(output):
+    process = subprocess.Popen(
+        'pbcopy', env={'LANG': 'en_US.UTF-8'}, stdin=subprocess.PIPE)
+    process.communicate(output.encode('utf-8'))
+
+
+def format_result(x):
+    return "{title} ({authors})".format(title=x.bib["title"],
+                                        authors=x.bib["author"])
+
+
+def format_results(results):
+    return "\n" + "\n".join(
+        "\t{i}. {str}".format(i=i, str=format_result(x))
+        for i, x in enumerate(results)) + "\n"
+
+
+def get_bib(result):
+    bib = btp.loads(requests.get(url=result.url_scholarbib).content)
+    bib.entries[0] = funcy.merge(result.bib, bib.entries[0])
+    bib_str = btp.dumps(bib)
+    return bib_str
+
+
+@click.command()
+@click.argument("query")
+def main(query):
+    results = gs.search_pubs_query(query)
+    top_results = funcy.take(10, results)
+
+    if len(top_results) == 0:
+        print("No results found.")
+        return None
+    elif len(top_results) == 1:
+        result = top_results[0]
+    else:
+        print(format_results(top_results))
+        idx = click.prompt("Choose an entry:", default=0)
+        result = top_results[idx]
+
+    bib = get_bib(result)
+    print(bib)
+    write_to_clipboard(bib)
+
+    # eprint = result.bib.get("eprint", None)
+    #  if eprint and click.confirm("Download pdf? y/n") == "y":
+    #     dir = click.prompt("Directory to save in:", default=DEFAULT_PDF_DIR)
+    #     response = requests.get(eprint)
+    #     fname = format_result(result) + ".pdf"
+    #     with open(fname, 'wb') as f:
+    #         f.write(response.content)
+
+
+if __name__ == "__main__":
+    main()

@@ -18,33 +18,45 @@ split <- str_split_fixed(kwargs, "=", 2)
 keys <- split[, 1]
 vals <- split[, 2]
 
-specials <- c("geom", "scale")
+specials <- c("geom", "scale", "fun", "facet")
 
 geoms <- vals[keys == "geom"]
 scales <- vals[keys == "scale"]
+funs <- vals[keys == "fun"]
+facets <- vals[keys == "facet"]
+
 aes_keys <-  keys[!(keys %in% specials)]
 aes_values <- vals[!(keys %in% specials)]
 aes_list <- as.list(aes_values) %>% setNames(aes_keys)
 aess <- do.call(aes_string, aes_list)
 
-geom_map <- list(line=geom_line,
-                 abline=geom_abline,
-                 point=geom_point,
-                 ribbon=geom_ribbon,
-                 errorbar=geom_errorbar,
-                 ecdf=stat_ecdf)
-scales_map <- list(x_log10=scale_x_log10,
-                   y_log10=scale_y_log10)
-
-apply_element <- function(map, gg, key) gg + map[[key]]()
+geom_map <- list(line=geom_line(),
+                 abline=geom_abline(),
+                 point=geom_point(),
+                 ribbon=geom_ribbon(),
+                 errorbar=geom_errorbar(),
+                 ecdf=stat_ecdf())
+scales_map <- list(logx=scale_x_log10(),
+                   logy=scale_y_log10(),
+                   loglog=list(scale_x_log10(), scale_y_log10()))
+funs_map <- list(poly1=stat_function(fun=function(x) 1 / x,
+                                     linetype="dashed", alpha=0.5),
+                 poly05=stat_function(fun=function(x) 1 / sqrt(x),
+                                      linetype="dashed", alpha=0.5))
 
 base_plot <- ggplot(df, aess) +
   theme_minimal() +
   theme(legend.position="bottom")
 
-plt <- base_plot %>%
-  reduce(geoms, partial(apply_element, geom_map), .init=.) %>%
-  reduce(scales, partial(apply_element, scales_map), .init=.)
+plt <- (
+  base_plot
+  + geom_map[geoms]
+  + scales_map[scales]
+  + funs_map[funs]
+  + `if`(length(facets) > 0,
+         facet_wrap(facets[[1]], label=label_both), list())
+)
+
 cat(sprintf("Saving plot to %s", outfile))
 ggsave(file=outfile, plot=plt, width=10, height=8, device="svg")
 browseURL(outfile)

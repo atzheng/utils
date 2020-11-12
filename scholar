@@ -2,10 +2,9 @@
 import requests
 import subprocess
 
-import bibtexparser as btp
 import click
 import funcy
-import scholarly as gs
+from scholarly import scholarly
 
 
 DEFAULT_PDF_DIR = "~/Dropbox (MIT)/papers"
@@ -19,7 +18,7 @@ def write_to_clipboard(output):
 
 def format_result(x):
     return "{title} ({authors})".format(title=x.bib["title"],
-                                        authors=x.bib["author"])
+                                        authors=",".join(x.bib["author"]))
 
 
 def format_results(results):
@@ -28,17 +27,10 @@ def format_results(results):
         for i, x in enumerate(results)) + "\n"
 
 
-def get_bib(result):
-    bib = btp.loads(requests.get(url=result.url_scholarbib).content)
-    bib.entries[0] = funcy.merge(result.bib, bib.entries[0])
-    bib_str = btp.dumps(bib)
-    return bib_str
-
-
 @click.command()
 @click.argument("query")
 def main(query):
-    results = gs.search_pubs_query(query)
+    results = scholarly.search_pubs(query)
     top_results = funcy.take(10, results)
 
     if len(top_results) == 0:
@@ -51,7 +43,7 @@ def main(query):
         idx = click.prompt("Choose an entry:", default=0)
         result = top_results[idx]
 
-    bib = get_bib(result)
+    bib = result.bibtex
     print(bib)
     write_to_clipboard(bib)
 

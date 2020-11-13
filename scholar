@@ -37,13 +37,14 @@ def main(query):
         print("No results found.")
         return None
     elif len(top_results) == 1:
-        result = top_results[0]
+        results = [top_results[0]]
     else:
         print(format_results(top_results))
-        idx = click.prompt("Choose an entry:", default=0)
-        result = top_results[idx]
+        idx_str = click.prompt("Choose an entry:", default="0")
+        idxx = idx_str.split(",")
+        results = [top_results[int(i)] for i in idxx]
 
-    bib = result.bibtex
+    bib = "\n".join([result.bibtex for result in results])
     print(bib)
     write_to_clipboard(bib)
 
